@@ -3,7 +3,7 @@ import pytest
 import boto3
 from moto import mock_secretsmanager
 import os
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 import json
 from io import BytesIO
 from src.extractor import (
@@ -20,45 +20,42 @@ def aws_credentials():
     os.environ["AWS_SESSION_TOKEN"] = "test"
     os.environ["AWS_DEFAULT_REGION"] = "eu-west-2"
 
+
 @pytest.fixture(scope="function")
 def secrets(aws_credentials):
     with mock_secretsmanager():
         yield boto3.client("secretsmanager", region_name="eu-west-2")
 
 
-
 test_s3_url = "s3://my_ingestion_bucket/new_data/file1.csv"
 
-class TestExtractorFunctionality(unittest.TestCase):    
+
+class TestExtractorFunctionality(unittest.TestCase):
     @patch('src.extractor.get_csv')
     @patch('src.extractor.get_con')
     @patch('src.extractor.get_credentials', autospec=True)
-    # @patch('src.extractor.load_json',
-    #        return_value=json.loads(test_json))
-    
     def test_extractor_calls_functions_correctly(
                         self,
-                        # mock_load_json, 
                         mock_get_credentials,
                         mock_get_con, mock_get_csv,
                         ):
         """Test checks that the main extract function calls all of the util
         functions correctly and with the correct returned parameters"""
-        # mock_log = MagicMock()
-        # mock_get_logger.return_value = mock_log
         extraction_handler(test_s3_url)
-        # mock_load_json.assert_called_once_with(test_json)
         mock_get_credentials.assert_called_once_with("S3Credentials")
         mock_get_con.assert_called_once_with(mock_get_credentials.return_value)
-        mock_get_csv.assert_called_once_with(mock_get_con.return_value, "s3://my_ingestion_bucket/new_data/file1.csv")
+        mock_get_csv.assert_called_once_with(mock_get_con.return_value,
+                                             test_s3_url)
+
 
 class TestSubFunctions(unittest.TestCase):
-    
     @patch('src.extractor.boto3.client')
     def test_csv_url_is_read_correctly(self, mock_boto_client):
         test_url = "s3://my_ingestion_bucket/new_data/file1.csv"
-        test_csv = """student_id,name,course,cohort,graduation_date,email_address\n
-                    1234,'John Smith','Software','2024-03-31','j.smith@email.com'
+        test_csv = """student_id,name,course,cohort,graduation_date,
+                    email_address\n
+                    1234,'John Smith','Software','2024-03-31',
+                    'j.smith@email.com'
                     """
         mock_s3_client = Mock()
         mock_boto_client.return_value = mock_s3_client

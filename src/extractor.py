@@ -1,34 +1,10 @@
-
-
-# main function:
-# takes JSON as argument
-# finds file in S3 from JSON
-# reformat to parquet
-# find columns reqd in JSON
-# change column contents to '***'
-# reformat to CSV
-# output string
-
 import boto3
 import json
 from pg8000.native import Connection
 from urllib.parse import urlparse
-import os
-import pandas as pd
-import io
-from io import StringIO
 
-# client = boto3.client('s3')
+# EXTRACTION FUNCTIONS
 
-
-
-
-# def load_json_from_local_path(json_path):
-#     with open(json_path, 'r') as f:
-#         return json.load(f)
-
-
-#EXTRACTION FUNCTIONS
 
 def get_credentials(secret_name):
     """
@@ -86,20 +62,11 @@ def get_csv(con, url):
 
 
 def extraction_handler(s3_url):
-    # print(os.getcwd())
-    # print(load_json_from_local_path('tests/data/test_json.json'))
-    
     credentials = get_credentials("S3Credentials")
     con = get_con(credentials)
     csv_to_be_transformed = get_csv(con, s3_url)
     return csv_to_be_transformed
 
 
-
-
-
-
-
-if __name__ == '__main__': 
+if __name__ == '__main__':
     extraction_handler("s3://my_ingestion_bucket/new_data/file1.csv")
-    
