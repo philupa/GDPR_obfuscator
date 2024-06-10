@@ -1,88 +1,138 @@
 import unittest
-import pytest
-import boto3
-from moto import mock_secretsmanager
-import os
-from unittest.mock import Mock, patch
-import json
-from io import BytesIO
+from unittest.mock import patch, MagicMock
 from src.extractor import (
     extraction_handler,
-    get_csv,
-    get_credentials)
-
-
-@pytest.fixture(scope="function")
-def aws_credentials():
-    os.environ["AWS_ACCESS_KEY_ID"] = "test"
-    os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
-    os.environ["AWS_SECURITY_TOKEN"] = "test"
-    os.environ["AWS_SESSION_TOKEN"] = "test"
-    os.environ["AWS_DEFAULT_REGION"] = "eu-west-2"
-
-
-@pytest.fixture(scope="function")
-def secrets(aws_credentials):
-    with mock_secretsmanager():
-        yield boto3.client("secretsmanager", region_name="eu-west-2")
+    get_csv)
+import os
+from botocore.exceptions import ClientError
 
 
 test_s3_url = "s3://my_ingestion_bucket/new_data/file1.csv"
+test_s3_bucket = "my_ingestion_bucket"
+test_s3_filepath = "new_data/file1.csv"
+test_csv = """student_id,name,course,cohort,graduation_date,email_address\n
+1234,'John Smith','Software','2024-03-31','j.smith@email.com'
+"""
 
 
 class TestExtractorFunctionality(unittest.TestCase):
     @patch('src.extractor.get_csv')
-    @patch('src.extractor.get_con')
-    @patch('src.extractor.get_credentials', autospec=True)
+    @patch('src.extractor.get_client')
     def test_extractor_calls_functions_correctly(
                         self,
-                        mock_get_credentials,
-                        mock_get_con, mock_get_csv,
+                        mock_get_client, mock_get_csv,
                         ):
-        """Test checks that the main extract function calls all of the util
+        """Test checks that the main extract function calls all of the
         functions correctly and with the correct returned parameters"""
         extraction_handler(test_s3_url)
-        mock_get_credentials.assert_called_once_with("S3Credentials")
-        mock_get_con.assert_called_once_with(mock_get_credentials.return_value)
-        mock_get_csv.assert_called_once_with(mock_get_con.return_value,
-                                             test_s3_url)
+
+        mock_get_client.assert_called_once()
+        mock_get_csv.assert_called_once_with(mock_get_client.return_value,
+                                             test_s3_bucket, test_s3_filepath)
+
+    @patch('src.extractor.get_csv')
+    @patch('src.extractor.get_client')
+    def test_extractor_calls_correctly_for_longer_filepaths(
+                        self,
+                        mock_get_client, mock_get_csv,
+                        ):
+        """Test checks that the main extract function works on other
+        filepaths"""
+        test_longer_s3_url = """s3://my_ingestion_bucket/new_folder/\
+unneeded_folder/new_data/file1.csv"""
+        test_longer_filepath = "new_folder/unneeded_folder/new_data/file1.csv"
+        extraction_handler(test_longer_s3_url)
+        mock_get_csv.assert_called_once_with(mock_get_client.return_value,
+                                             test_s3_bucket,
+                                             test_longer_filepath)
 
 
 class TestSubFunctions(unittest.TestCase):
     @patch('src.extractor.boto3.client')
     def test_csv_url_is_read_correctly(self, mock_boto_client):
-        test_url = "s3://my_ingestion_bucket/new_data/file1.csv"
-        test_csv = """student_id,name,course,cohort,graduation_date,
-                    email_address\n
-                    1234,'John Smith','Software','2024-03-31',
-                    'j.smith@email.com'
-                    """
-        mock_s3_client = Mock()
+        # Set up the mock S3 client
+        mock_s3_client = MagicMock()
         mock_boto_client.return_value = mock_s3_client
+        # Create a mock response body
+        mock_body = MagicMock()
+        mock_body.read.return_value = test_csv.encode('utf-8')
+        # Mock the response from S3
         mock_s3_client.get_object.return_value = {
-            'Body': BytesIO(test_csv.encode('utf-8'))
+            'Body': mock_body
         }
-        result = get_csv(mock_s3_client, test_url)
+        result = get_csv(mock_s3_client, "my_ingestion_bucket",
+                         'new_data/file1.csv')
+        print(result, "<<")
         self.assertEqual(result, test_csv)
 
 
-class TestGetCredentials:
-    def test_get_credentials(self, secrets):
-        """
-        Checks to see that get_credentials() is able to connect to
-        the AWS secrets manager and return the correct credentials
-        to connect to OLTP DB
-        """
-        secret_id = "test_secret"
-        secret_values = {
-            "engine": "postgres",
-            "username": "test_user",
-            "password": "test_password",
-            "host": "test-database.us-west-2.rds.amazonaws.com",
-            "dbname": "test-database",
-            "port": "2222",
-        }
-        secrets.create_secret(Name=secret_id,
-                              SecretString=json.dumps(secret_values))
-        output = get_credentials(secret_id)
-        assert output == secret_values
+class TestExtractorEpii field not foundrrorHandling(unittest.TestCase):
+
+    @patch('src.extractor.get_client')
+    def test_non_csv_files_raise_TypeError(self, mock_get_client):
+        mock_s3_client = MagicMock()
+        mock_get_client.return_value = mock_s3_client
+        test_non_csv_url = "s3://my_ingestion_bucket/new_data/file1.jpg"
+        if os.path.exists('log.txt'):
+            os.remove('log.txt')
+        extraction_handler(test_non_csv_url)
+        with open('log.txt', 'r') as log_file:
+            log_contents = log_file.read()
+        self.assertIn("file is not csv format", log_contents)
+
+    @patch('src.extractor.get_client')
+    def test_non_files_raise_TypeError(self, mock_get_client):
+        mock_s3_client = MagicMock()
+        mock_get_client.return_value = mock_s3_client
+        test_non_string = 1
+        if os.path.exists('log.txt'):
+            os.remove('log.txt')
+        extraction_handler(test_non_string)
+        with open('log.txt', 'r') as log_file:
+            log_contents = log_file.read()
+        self.assertIn("file path not given correctly", log_contents)
+
+    @patch('src.extractor.get_client')
+    def test_exception_error(self, mock_get_client):
+        mock_s3_client = MagicMock()
+        mock_get_client.return_value = mock_s3_client
+        mock_get_client.side_effect = Exception
+        test_non_string = test_s3_url
+        if os.path.exists('log.txt'):
+            os.remove('log.txt')
+        extraction_handler(test_non_string)
+        with open('log.txt', 'r') as log_file:
+            log_contents = log_file.read()
+        self.assertIn("An unexpected error has occurred:", log_contents)
+
+    @patch('src.extractor.get_client')
+    def test_internal_service_error(self, mock_get_client):
+        mock_s3_client = MagicMock()
+        mock_get_client.return_value = mock_s3_client
+        mock_get_client.side_effect = ClientError(
+            error_response={"Error": {"Code": "InternalServiceError"}},
+            operation_name="ClientError"
+        )
+        test_non_string = test_s3_url
+        if os.path.exists('log.txt'):
+            os.remove('log.txt')
+        extraction_handler(test_non_string)
+        with open('log.txt', 'r') as log_file:
+            log_contents = log_file.read()
+        self.assertIn("Internal service error detected.", log_contents)
+
+    @patch('src.extractor.get_client')
+    def test_bucket_not_found(self, mock_get_client):
+        mock_s3_client = MagicMock()
+        mock_get_client.return_value = mock_s3_client
+        mock_get_client.side_effect = ClientError(
+            error_response={"Error": {"Code": "NoSuchBucket"}},
+            operation_name="ClientError"
+        )
+        test_non_string = test_s3_url
+        if os.path.exists('log.txt'):
+            os.remove('log.txt')
+        extraction_handler(test_non_string)
+        with open('log.txt', 'r') as log_file:
+            log_contents = log_file.read()
+        self.assertIn("Bucket not found.", log_contents)

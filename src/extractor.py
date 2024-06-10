@@ -1,72 +1,58 @@
 import boto3
-import json
-from pg8000.native import Connection
-from urllib.parse import urlparse
+import logging
+from botocore.exceptions import ClientError
+
+
+# Setting up logging
+def setup_logging():
+    logger = logging.getLogger()
+    # Remove all handlers associated with the root logger:
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+
+    logger.setLevel(logging.DEBUG)
+    handler = logging.FileHandler('log.txt', mode='w')
+    formatter = logging.Formatter('%(asctime)s - %(name)s\
+                                  - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger
+
 
 # EXTRACTION FUNCTIONS
 
-
-def get_credentials(secret_name):
-    """
-    Gets credentials from AWS Secrets Manager using
-    a specified secret name which will need to be
-    set up manually with a JSON object with your own
-    credentials in order to access the S3 bucket.
-    Required saved structure for example is:
-        {
-            "username": "YOUR_USERNAME",
-            "password": "YOUR_PASSWORD",
-            "engine": "YOUR_DB_ENGINE",
-            "port": "1234"
-            "host": "YOUR_HOST",
-            "dbname": "YOUR_DB_NAME"
-        }
-    Returns a python dictionary structure that is used in
-    getting the connection to the database
-    Credentials for this project include:
-        - username
-        - host
-        - database name (as dbname)
-        - password
-    """
-    client = boto3.client("secretsmanager", region_name="eu-west-2")
-    response = client.get_secret_value(SecretId=secret_name)
-    return json.loads(response["SecretString"])
+def get_client():
+    s3 = boto3.client("s3", region_name="eu-west-2")
+    return s3
 
 
-def get_con(credentials):
-    """
-    Gets the connection to a database using the returned
-    credentials obtained.
-    Uses pg8000 to establish the connection.
-    Returns an instance of the pg8000 connection class.
-    """
-    return Connection(
-        user=credentials["username"],
-        host=credentials["host"],
-        database=credentials["dbname"],
-        password=credentials["password"],
-    )
-
-
-def get_csv(con, url):
-    url = urlparse(url)
-    s3_bucket = url.netloc
-    s3_path = url.path
-    response = con.get_object(
-          Bucket=s3_bucket,
-          Key=s3_path
-     )
-    csv_string = response['Body'].read().decode('utf-8')
-    return csv_string
+def get_csv(client, target_bucket, filepath):
+    response = client.get_object(
+        Bucket=target_bucket,
+        Key=filepath)
+    csv_data = response['Body'].read().decode('utf-8')
+    return csv_data
 
 
 def extraction_handler(s3_url):
-    credentials = get_credentials("S3Credentials")
-    con = get_con(credentials)
-    csv_to_be_transformed = get_csv(con, s3_url)
-    return csv_to_be_transformed
-
-
-if __name__ == '__main__':
-    extraction_handler("s3://my_ingestion_bucket/new_data/file1.csv")
+    logger = setup_logging()
+    try:
+        if s3_url[-4:] != '.csv':
+            logger.error("file is not csv format")
+            return
+        client = get_client()
+        s3_bucket = s3_url.split('/')[2]
+        s3_filepath = '/'.join(s3_url.split('/')[3:])
+        csv_to_be_transformed = get_csv(client, s3_bucket, s3_filepath)
+        return csv_to_be_transformed
+    except ClientError as err:
+        if err.response["Error"]["Code"] == "InternalServiceError":
+            logger.error("Internal service error detected.")
+        if err.response["Error"]["Code"] == "NoSuchBucket":
+            logger.error("Bucket not found.")
+    except TypeError:
+        logger.error("file path not given correctly")
+        return
+    except Exception as err:
+        logger.error(f"An unexpected error has occurred: {str(err)}")
+        return err

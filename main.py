@@ -4,26 +4,40 @@ from src.transformer import transformation_handler
 
 # main function:
 # takes JSON as argument
-# finds file in S3 from JSON
-# reformat to parquet
-# find columns reqd in JSON
+# finds file in S3 bucket as required by JSON info
+# reformats file to dataframe
+# find columns as required by JSON info
 # change column contents to '***'
-# reformat to CSV
-# output string
+# reformats to CSV
+# output CSV string
 
 
-def load_json(json_file):
-    return json.loads(json_file)
+class DataTransformer:
+    def __init__(self, json_file):
+        self.json_loaded = self.load_json(json_file)
+        self.s3_url = self.json_loaded['file_to_obfuscate']
+        self.pii_fields = self.json_loaded['pii_fields']
+        self._csv_to_be_transformed = self._extraction_handler(self.s3_url)
 
-# MAIN FUNCTION
+    def load_json(self, json_file):
+        return json.loads(json_file)
+
+    def _extraction_handler(self, s3_url):
+        return extraction_handler(s3_url)
+
+    def _transformation_handler(self, csv_data, pii_fields):
+        return transformation_handler(csv_data, pii_fields)
+
+    def anonymise(self):
+        anonymised_csv = self._transformation_handler(
+            self._csv_to_be_transformed,
+            self.pii_fields)
+        return anonymised_csv
 
 
 def main(json_file):
-    json_loaded = load_json(json_file)
-    s3_url = json_loaded['file_to_obfuscate']
-    pii_fields = json_loaded['pii_fields']
-    csv_to_be_transformed = extraction_handler(s3_url)
-    anonymised_csv = transformation_handler(csv_to_be_transformed, pii_fields)
+    transformer = DataTransformer(json_file)
+    anonymised_csv = transformer.anonymise()
     return anonymised_csv
 
 
