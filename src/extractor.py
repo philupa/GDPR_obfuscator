@@ -1,6 +1,7 @@
 import boto3
 import logging
 from botocore.exceptions import ClientError
+import json
 
 
 # Setting up logging
@@ -26,33 +27,40 @@ def get_client():
     return s3
 
 
-def get_csv(client, target_bucket, filepath):
+def get_data(client, target_bucket, filepath):
     response = client.get_object(
         Bucket=target_bucket,
         Key=filepath)
-    csv_data = response['Body'].read().decode('utf-8')
-    return csv_data
+    if filepath[-4:] == '.csv':
+        data_body = response['Body'].read().decode('utf-8')
+    else:
+        data_body = json.loads(response['Body'].read())
+    return data_body
 
 
 def extraction_handler(s3_url):
     logger = setup_logging()
     try:
-        if s3_url[-4:] != '.csv':
-            logger.error("file is not csv format")
+        if type(s3_url) is str:
+            client = get_client()
+            s3_bucket = s3_url.split('/')[2]
+            s3_filepath = '/'.join(s3_url.split('/')[3:])
+            if s3_url[-4:] == '.csv' or s3_url[-4:] == '.json':
+                data_to_be_transformed = get_data(client, s3_bucket, s3_filepath)
+                return data_to_be_transformed
+            else:
+                logger.error("File is not csv or json format.")
+                return
+        else:
+            logger.error("File path not given correctly.")
             return
-        client = get_client()
-        s3_bucket = s3_url.split('/')[2]
-        s3_filepath = '/'.join(s3_url.split('/')[3:])
-        csv_to_be_transformed = get_csv(client, s3_bucket, s3_filepath)
-        return csv_to_be_transformed
     except ClientError as err:
         if err.response["Error"]["Code"] == "InternalServiceError":
             logger.error("Internal service error detected.")
         if err.response["Error"]["Code"] == "NoSuchBucket":
             logger.error("Bucket not found.")
-    except TypeError:
-        logger.error("file path not given correctly")
-        return
+        if err.response["Error"]["Code"] == "NoSuchKey":
+            logger.error("File not found.")
     except Exception as err:
         logger.error(f"An unexpected error has occurred: {str(err)}")
         return err

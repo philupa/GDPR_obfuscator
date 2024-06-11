@@ -17,13 +17,13 @@
 ### Example Target File:
 ```
 student_id,name,course,cohort,graduation_date,email_address
-1234,'John Smith','Software','2024-03-31','j.smith@email.com'
+1234,'John Smith','Software','Jan','2024-03-31','j.smith@email.com'
 ```
 
 ### Example Output:
 ```
 student_id,name,course,cohort,graduation_date,email_address
-1234,'***','Software','2024-03-31','***'
+1234,'***','Software','Jan','2024-03-31','***'
 ```
 
 

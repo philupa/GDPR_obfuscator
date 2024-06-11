@@ -2,6 +2,7 @@ import pandas as pd
 import io
 from io import StringIO
 import logging
+import json
 
 
 # Setting up logging
@@ -21,29 +22,42 @@ def setup_logging():
 
 
 # TRANSFORMATION FUNCTION
-def transformation_handler(csv_to_be_transformed, pii_fields):
+def transformation_handler(data_to_be_transformed, pii_fields):
     logger = setup_logging()
-    if len(csv_to_be_transformed) == 0:
-        logger.error('csv file is blank')
+    if len(pii_fields) == 0:
+        logger.info('No PII fields given.')
+    if type(data_to_be_transformed) is str or type(data_to_be_transformed) is list:
+        if len(data_to_be_transformed) == 0:
+            logger.error('Input file is blank.')
+            return
+    if type(data_to_be_transformed) is str:
+        df_with_pii = pd.read_csv(StringIO(data_to_be_transformed), sep=",")
+    elif type(data_to_be_transformed) is list:
+        df_with_pii = pd.DataFrame.from_dict(data_to_be_transformed)
+        print(df_with_pii, "<<<")    
+    else: 
+        logger.error('Unsupported data type.')
         return
-    df_with_pii = pd.read_csv(StringIO(csv_to_be_transformed), sep=",")
-    if len(df_with_pii.index) == 0:
-        logger.error('csv file has no content')
+    if df_with_pii.empty:
+        logger.error('Input data file has no content.')
         return
     for item in pii_fields:
         if item not in df_with_pii.columns:
-            logger.error('pii field "' + item + '" not found in file')
-            return
+            logger.error(f'PII field "{item}" not found in file.')
     df_anonymised = pd.DataFrame(columns=df_with_pii.columns)
     for column in df_with_pii.columns:
         if column in pii_fields:
             df_anonymised[column] = ['***'] * len(df_with_pii)
         else:
             df_anonymised[column] = df_with_pii[column]
-    csv_buffer = io.BytesIO()
-    df_anonymised.to_csv(csv_buffer, index=False)
-    csv_byte_stream = csv_buffer.getvalue()
-    return csv_byte_stream
+    if type(data_to_be_transformed) is str:
+        csv_buffer = io.BytesIO()
+        df_anonymised.to_csv(csv_buffer, index=False)
+        output = csv_buffer.getvalue()
+    elif type(data_to_be_transformed) is list:
+        json_string = df_anonymised.to_json(orient='records')
+        output = json.loads(json_string)
+    return output
 
 
 if __name__ == '__main__':

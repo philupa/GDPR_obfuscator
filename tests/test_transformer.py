@@ -30,6 +30,63 @@ email_address\n\
         actual = transformation_handler(test_csv, test_pii_fields)
         assert actual == test_result
 
+    def test_transformer_works_with_json(self):
+        test_json = [{
+            "student_id": 1234,
+            "name" : "John Smith",
+            "course" : "Software",
+            "cohort" : "Jan",
+            "graduation_date": "2024-03-31",
+            "email_address": "j.smith@email.com"
+        }]
+        test_pii_fields = ["name", "email_address"]
+        actual = transformation_handler(test_json, test_pii_fields)
+        test_result_json = [{
+            "student_id": 1234,
+            "name" : "***",
+            "course" : "Software",
+            "cohort" : "Jan",
+            "graduation_date": "2024-03-31",
+            "email_address": "***"
+        }]
+        assert actual == test_result_json
+
+    def test_transformer_works_with_json_with_multiples(self):
+        test_json = [{
+            "student_id": 1234,
+            "name" : "John Smith",
+            "course" : "Software",
+            "cohort" : "Jan",
+            "graduation_date": "2024-03-31",
+            "email_address": "j.smith@email.com"
+        },
+        {
+            "student_id": 1235,
+            "name" : "Joe Smith",
+            "course" : "Data",
+            "cohort" : "Jan",
+            "graduation_date": "2024-03-31",
+            "email_address": "j.smith2@email.com"
+        }]
+        test_pii_fields = ["name", "email_address"]
+        actual = transformation_handler(test_json, test_pii_fields)
+        test_result_json = [{
+            "student_id": 1234,
+            "name" : "***",
+            "course" : "Software",
+            "cohort" : "Jan",
+            "graduation_date": "2024-03-31",
+            "email_address": "***"
+        },
+        {
+            "student_id": 1235,
+            "name" : "***",
+            "course" : "Data",
+            "cohort" : "Jan",
+            "graduation_date": "2024-03-31",
+            "email_address": "***"
+        }]
+        assert actual == test_result_json
 
 class TestSecurityVulnerabilities():
     def test_transformer_input_is_not_mutated(self):
@@ -60,24 +117,49 @@ class TestErrorHandling():
         transformation_handler(test_csv, test_pii_fields)
         with open('log.txt', 'r') as log_file:
             log_contents = log_file.read()
-        log_message = 'pii field "location" not found in file'
+        log_message = 'PII field "location" not found in file.'
         assert log_message in log_contents
 
     def test_csv_file_blank(self):
         test_csv = ""
         test_pii_fields = ["name", "email_address"]
+        if os.path.exists('log.txt'):
+            os.remove('log.txt')
         transformation_handler(test_csv, test_pii_fields)
         with open('log.txt', 'r') as log_file:
             log_contents = log_file.read()
-        log_message = 'csv file is blank'
+        log_message = 'Input file is blank.'
         assert log_message in log_contents
 
     def test_csv_file_has_has_no_content(self):
         test_csv = """student_id,name,course,cohort,graduation_date,\
 email_address"""
         test_pii_fields = ["name", "email_address"]
+        if os.path.exists('log.txt'):
+            os.remove('log.txt')
         transformation_handler(test_csv, test_pii_fields)
         with open('log.txt', 'r') as log_file:
             log_contents = log_file.read()
-        log_message = 'csv file has no content'
+        log_message = 'Input data file has no content.'
+        assert log_message in log_contents
+
+    def test_data_file_is_not_correct_type(self):
+        test_data = 1
+        test_pii_fields = ["name", "email_address"]
+        if os.path.exists('log.txt'):
+            os.remove('log.txt')
+        transformation_handler(test_data, test_pii_fields)
+        with open('log.txt', 'r') as log_file:
+            log_contents = log_file.read()
+        log_message = 'Unsupported data type.'
+        assert log_message in log_contents
+
+    def test_no_pii_fields_given(self):
+        test_pii_fields = []
+        if os.path.exists('log.txt'):
+            os.remove('log.txt')
+        transformation_handler(test_csv, test_pii_fields)
+        with open('log.txt', 'r') as log_file:
+            log_contents = log_file.read()
+        log_message = 'No PII fields given.'
         assert log_message in log_contents
