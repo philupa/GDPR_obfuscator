@@ -1,6 +1,6 @@
 import pandas as pd
 import io
-from io import StringIO
+from io import StringIO, BytesIO
 import logging
 import json
 
@@ -26,16 +26,23 @@ def transformation_handler(data_to_be_transformed, pii_fields):
     logger = setup_logging()
     if len(pii_fields) == 0:
         logger.info('No PII fields given.')
-    if type(data_to_be_transformed) is str or type(data_to_be_transformed) is list:
+    if (type(data_to_be_transformed) is str or
+       type(data_to_be_transformed) is list or
+       type(data_to_be_transformed) is bytes):
         if len(data_to_be_transformed) == 0:
             logger.error('Input file is blank.')
             return
     if type(data_to_be_transformed) is str:
+        if data_to_be_transformed.find(',') == -1:
+            logger.error('Comma not used as delimiter in CSV.')
+            return
         df_with_pii = pd.read_csv(StringIO(data_to_be_transformed), sep=",")
     elif type(data_to_be_transformed) is list:
         df_with_pii = pd.DataFrame.from_dict(data_to_be_transformed)
-        print(df_with_pii, "<<<")    
-    else: 
+    elif type(data_to_be_transformed) is bytes:
+        buffer = BytesIO(data_to_be_transformed)
+        df_with_pii = pd.read_parquet(buffer)
+    else:
         logger.error('Unsupported data type.')
         return
     if df_with_pii.empty:
@@ -57,6 +64,10 @@ def transformation_handler(data_to_be_transformed, pii_fields):
     elif type(data_to_be_transformed) is list:
         json_string = df_anonymised.to_json(orient='records')
         output = json.loads(json_string)
+    elif type(data_to_be_transformed) is bytes:
+        buffer = BytesIO()
+        df_anonymised.to_parquet(buffer, index=False)
+        output = buffer.getvalue()
     return output
 
 

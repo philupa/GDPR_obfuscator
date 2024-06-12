@@ -4,7 +4,7 @@
 
 ## The Module
 
-<p align="justify">1. The module takes a JSON which contains an AWS S3 bucket location of where the data is stored. The data is extracted from this location.</p>
+<p align="justify">1. The module takes a JSON which contains an AWS S3 bucket location of where the data is stored. The data is extracted from this location. The module can accept CSV, JSON or parquet(bytes) data formats.</p>
 <p align="justify">2. The module converts the data to a pandas dataframe and obfuscates all data from any fields which have been defined in the original JSON, transforming all data in that column to "***". The data is then returned in its original file format.</p>
 
 ## Example

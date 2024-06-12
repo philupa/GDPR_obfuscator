@@ -8,8 +8,8 @@ from src.transformer import transformation_handler
 # reformats file to dataframe
 # find columns as required by JSON info
 # change column contents to '***'
-# reformats to CSV
-# output CSV string
+# reformats to original filetype
+# output
 
 
 class DataTransformer:
@@ -25,8 +25,8 @@ class DataTransformer:
     def _extraction_handler(self, s3_url):
         return extraction_handler(s3_url)
 
-    def _transformation_handler(self, csv_data, pii_fields):
-        return transformation_handler(csv_data, pii_fields)
+    def _transformation_handler(self, body_data, pii_fields):
+        return transformation_handler(body_data, pii_fields)
 
     def anonymise(self):
         anonymised_csv = self._transformation_handler(

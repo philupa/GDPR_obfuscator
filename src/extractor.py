@@ -2,6 +2,7 @@ import boto3
 import logging
 from botocore.exceptions import ClientError
 import json
+from io import BytesIO
 
 
 # Setting up logging
@@ -33,8 +34,11 @@ def get_data(client, target_bucket, filepath):
         Key=filepath)
     if filepath[-4:] == '.csv':
         data_body = response['Body'].read().decode('utf-8')
-    else:
+    elif filepath[-5:] == '.json':
         data_body = json.loads(response['Body'].read())
+    elif filepath[-4:] == '.pqt' or filepath[-8:] == '.parquet':
+        buffer = BytesIO(response['Body'].read())
+        data_body = buffer.getvalue()
     return data_body
 
 
@@ -45,11 +49,13 @@ def extraction_handler(s3_url):
             client = get_client()
             s3_bucket = s3_url.split('/')[2]
             s3_filepath = '/'.join(s3_url.split('/')[3:])
-            if s3_url[-4:] == '.csv' or s3_url[-4:] == '.json':
-                data_to_be_transformed = get_data(client, s3_bucket, s3_filepath)
+            if (s3_url[-4:] == '.csv' or s3_url[-5:] == '.json' or
+               s3_url[-4:] == '.pqt' or s3_url[-8:] == '.parquet'):
+                data_to_be_transformed = get_data(
+                    client, s3_bucket, s3_filepath)
                 return data_to_be_transformed
             else:
-                logger.error("File is not csv or json format.")
+                logger.error("File is not csv or json or parquet format.")
                 return
         else:
             logger.error("File path not given correctly.")
