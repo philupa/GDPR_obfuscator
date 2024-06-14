@@ -25,6 +25,7 @@ test_json_body = {
                  }
 
 
+# Test that extractor function works as intended for all reqd file types:
 class TestExtractorFunctionality(unittest.TestCase):
     @patch('src.extractor.get_data')
     @patch('src.extractor.get_client')
@@ -89,16 +90,14 @@ unneeded_folder/new_data/file1.csv"""
                                          pqt_filepath)
 
 
+# Test get_data function works with all required file types:
 class TestSubFunctions(unittest.TestCase):
     @patch('src.extractor.boto3.client')
     def test_csv_url_is_read_correctly(self, mock_boto_client):
-        # Set up the mock S3 client
         mock_s3_client = MagicMock()
         mock_boto_client.return_value = mock_s3_client
-        # Create a mock response body
         mock_body = MagicMock()
         mock_body.read.return_value = test_csv.encode('utf-8')
-        # Mock the response from S3
         mock_s3_client.get_object.return_value = {
             'Body': mock_body
         }
@@ -108,14 +107,11 @@ class TestSubFunctions(unittest.TestCase):
 
     @patch('src.extractor.boto3.client')
     def test_json_url_is_read_correctly(self, mock_boto_client):
-        # Set up the mock S3 client
         mock_s3_client = MagicMock()
         mock_boto_client.return_value = mock_s3_client
-        # Create a mock response body
         mock_body = MagicMock()
         mock_body.read.return_value = json.dumps(
             test_json_body).encode('utf-8')
-        # Mock the response from S3
         mock_s3_client.get_object.return_value = {
             'Body': mock_body
         }
@@ -130,13 +126,10 @@ class TestSubFunctions(unittest.TestCase):
         buffer = BytesIO()
         df.to_parquet(buffer, index=False, engine='pyarrow')
         buffer.seek(0)
-        # Set up the mock S3 client
         mock_s3_client = MagicMock()
         mock_boto_client.return_value = mock_s3_client
-        # Create a mock response body
         mock_body = MagicMock()
         mock_body.read.return_value = buffer.getvalue()
-        # Mock the response from S3
         mock_s3_client.get_object.return_value = {
             'Body': mock_body
         }
@@ -145,8 +138,8 @@ class TestSubFunctions(unittest.TestCase):
         self.assertEqual(result, buffer.getvalue())
 
 
+# Check all error handling works as intended:
 class TestExtractorErrorHandling(unittest.TestCase):
-
     @patch('src.extractor.get_client')
     def test_non_correct_file_types_raise_TypeError(self, mock_get_client):
         mock_s3_client = MagicMock()

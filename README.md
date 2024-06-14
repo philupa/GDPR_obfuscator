@@ -40,6 +40,14 @@ To use the pipeline, ensure you have met the following requirements:
     make requirements
     ```
 
+### Assumptions
+
+* CSV data is comma separated.
+* CSV files have extension .csv.
+* JSON files have extension .json.
+* Parquet data is in binary format.
+* Parquet files have extension .pqt or .parquet.
+
 ## Contributor
 
 * Philippa Clarkson [@philupa](https://github.com/philupa)

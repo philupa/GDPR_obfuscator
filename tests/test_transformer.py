@@ -11,6 +11,7 @@ test_s3_url = "s3://my_ingestion_bucket/new_data/file1.csv"
 test_json_url = "s3://my_ingestion_bucket/new_data/file1.json"
 
 
+# Test transfomer function works as intended for all reqd file types:
 class TestTransformerFunctionality():
     def test_transformer_works_with_one_row(self):
         test_pii_fields = ["name", "email_address"]
@@ -97,7 +98,6 @@ email_address\n\
         df_original.to_parquet(buffer_original, index=False, engine='pyarrow')
         buffer_original.seek(0)
         test_pii_fields = ["name", "email_address"]
-        # expected dataframe:
         expected_csv = """student_id,name,course,cohort,graduation_date,\
 email_address\n1234,***,'Software','August','2024-03-31',***\n"""
         df_expected = pd.read_csv(StringIO(expected_csv))
@@ -113,6 +113,7 @@ email_address\n1234,***,'Software','August','2024-03-31',***\n"""
         pd.testing.assert_frame_equal(df_expected, df_transformed_csv)
 
 
+# Test for mutation of data and that the output is created new:
 class TestSecurityVulnerabilities():
     def test_transformer_input_is_not_mutated(self):
         test_pii_fields = ["name", "email_address"]
@@ -134,6 +135,7 @@ email_address
         assert test_csv is not output.decode('utf-8')
 
 
+# Test that all error handling works as intended:
 class TestErrorHandling():
     def test_pii_field_not_found_error(self):
         test_pii_fields = ['location']
